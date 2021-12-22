@@ -1,0 +1,155 @@
+// Client
+#include <WinSock2.h>
+#include <iostream>
+#include<string>
+#pragma comment(lib,"ws2_32.lib")
+#pragma warning(disable:4996)
+using namespace std;
+
+SOCKET Connection;
+
+void ClientSurvey() {
+	while (true) {
+		int msg_size=0, name_size=0;
+		if (Connection == 0) {
+			cout << "Lost connection to server...\nPlease restart programm\n";
+			return;
+		}
+		else {
+			recv(Connection, (char*)&name_size, sizeof(int), NULL);
+			char* name = new char[name_size + 1];
+			name[name_size] = '\0';
+			recv(Connection, name, name_size, NULL);
+			recv(Connection, (char*)&msg_size, sizeof(int), NULL);
+			char* msg = new char[msg_size + 1];
+			msg[msg_size] = '\0';
+			recv(Connection, msg, msg_size, NULL);
+			cout << endl << name << " ==>> " << msg << endl;
+			delete[]name, msg;
+		}
+	}
+}
+
+int main() {
+	//WSAStartup;
+	WSAData wsaData;
+	WORD DLLVersion = MAKEWORD(2, 1);
+	if (WSAStartup(DLLVersion, &wsaData) != 0)	
+		cout << "Error WSAStartap " << endl;
+	else {
+		SOCKADDR_IN addr;
+		int sizeofaddr = sizeof(addr);
+		addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+		addr.sin_port = htons(1111);
+		addr.sin_family = AF_INET;
+		Connection = socket(AF_INET, SOCK_STREAM, NULL);
+		connect(Connection, (SOCKADDR*)&addr, sizeofaddr);
+		if (Connection == 0)
+			cout << "Error to connect\n";
+		else {
+			cout << "Server sucessfuly connected!\n";
+			CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientSurvey, NULL, NULL, NULL);
+			string msg, name;
+			int msg_size=0, name_size=0;
+			cout << "\nEnter your username: ";
+			getline(cin, name);
+			system("pause");
+			cout << "Type your massages\n";
+			while (Connection != 0) {
+				getline(cin, msg);
+				cout << endl;
+				send(Connection, (char*)&name_size, sizeof(int), NULL);
+				send(Connection, name.c_str(), name_size, NULL);
+				send(Connection, (char*)&msg_size, sizeof(int), NULL);
+				send(Connection, msg.c_str(), msg_size, NULL);
+				Sleep(500);
+			}
+		}
+	}
+
+	system("pause");
+	return 0;
+}
+
+
+
+// Server
+#include <WinSock2.h>
+#include <iostream>
+#include<string>
+#pragma comment(lib,"ws2_32.lib")
+#pragma warning(disable:4996)
+#define cl 64
+using namespace std;
+
+SOCKADDR_IN addr;
+SOCKET Connections[cl];
+int Count = 0;
+void ClientSurvey(int ind) {
+	int msg_size=0, name_size=0;
+	while (true) {
+		if (Connections[ind]== 0) {
+			cout << "Lost connection to client " << ind << endl;
+			return;
+		}
+		else {
+			recv(Connections[ind], (char*)&name_size, sizeof(int), NULL);
+			char* name = new char[name_size + 1];
+			name[name_size] = '\0';
+			recv(Connections[ind], name, name_size, NULL);
+			recv(Connections[ind], (char*)&msg_size, sizeof(int), NULL);
+			char* msg = new char[msg_size + 1];
+			msg[msg_size] = '\0';
+			recv(Connections[ind], msg, msg_size, NULL);
+			for (int i = 0; i < Count; i++) {
+				if (i == ind)
+					continue;
+				else if (Connections[ind] != 0)
+					continue;
+				else {
+					send(Connections[ind], (char*)&name_size, sizeof(int), NULL);
+					send(Connections[ind], (char*)&name, name_size, NULL);
+					send(Connections[ind], (char*)&msg_size, sizeof(int), NULL);
+					send(Connections[ind], (char*)&msg, msg_size, NULL);
+				}
+			}
+			delete[]name, msg;
+		}
+	}
+}
+
+int main() {
+	WSAStartup;
+	WSAData wsaData;
+	WORD DLLVersion = MAKEWORD(2, 1);
+	if (WSAStartup(DLLVersion, &wsaData) != 0)
+		cout << "Error WSAStartap " << endl;
+	else {
+		int sizeofaddr = sizeof(addr);
+		addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+		addr.sin_port = htons(1111);
+		addr.sin_family = AF_INET;
+
+		SOCKET sListen = socket(AF_INET, SOCK_STREAM, NULL);
+		bind(sListen, (SOCKADDR*)&addr, sizeof(addr));
+		listen(sListen, SOMAXCONN);
+		SOCKET newConnection;
+		cout << "Server is ready!\n";
+
+		for (int ind = 0; ind < cl; ind++) {
+			newConnection = accept(sListen, (SOCKADDR*)&addr, &sizeofaddr);
+			if (newConnection == 0)
+				cout << "Error to connect" << endl;
+			else {
+				cout << "Client sucessfuly connected!" << endl;
+				Connections[ind] = newConnection;
+				Count++;
+				CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientSurvey, (LPVOID)(ind), NULL, NULL);
+			}
+		}
+
+	}
+
+	system("pause");
+	return 0;
+}
